@@ -1,0 +1,154 @@
+---
+title: "pm566-midterm-fall2022"
+author: "Misha Khan"
+date: "2022-10-21"
+output: html_document
+---
+
+```{r}
+library(stringr)
+library(dplyr)
+library(tidyverse)
+library(rvest)
+library(xml2)
+library(dbplyr)
+library(dplyr)
+library(skimr) 
+library(ggplot2)
+library(data.table)
+library(lubridate)
+```
+
+Topic: Crime Data from 2020 to Present in Los Angeles
+Missing data (0, 0) for long and lat are for privacy
+URL: https://data.lacity.org/Public-Safety/Crime-Data-from-2020-to-Present/2nrs-mtv8
+```{r}
+crimeraw <- read.csv("Crime_Data_from_2020_to_Present.csv")
+```
+
+Data Cleaning
+Rename cols to make it more meaningful
+```{r}
+colnames(crimeraw) <- c('Record No',
+                        'Date Reported',
+                        'Date Occurred',
+                        'Time Occurred',
+                        'Area No',
+                        'Area',
+                        'Rpt Dist No', #drop
+                        'Part', #drop
+                        'Crime Code',
+                        'Crime',
+                        'MO', #drop
+                        'Victim Age',
+                        'Victim Sex',
+                        'Victim Ethnicity',
+                        'Premise Code',
+                        'Premise',
+                        'Weapon Code',
+                        'Weapon',
+                        'Case Code',
+                        'Case Status',
+                        'Crime Code 1',
+                        'Crime Code 2',
+                        'Crime Code 3',
+                        'Crime Code 4',
+                        'Location',
+                        'Cross Street',
+                        'Lat',
+                        'Lon'
+                        )
+
+crimeraw <- select(crimeraw, -c('Rpt Dist No','Part', 'MO','Crime Code 1', 'Crime Code 2', 'Crime Code 3', 'Crime Code 4', 'Cross Street'))
+```
+
+Reformat date variables (EDA: Date when most crimes occur)
+```{r}
+crimeraw$`Date Reported` <- as.Date(crimeraw$`Date Reported`, format = "%m/%d/%Y")
+crimeraw$`Date Occurred` <- as.Date(crimeraw$`Date Occurred`, format = "%m/%d/%Y")
+```
+
+Change miltary to standard time (Possible EDA: Time when most crime occur)
+```{r}
+crimeraw$`Time Occurred` <- format(strptime(substr(as.POSIXct(sprintf("%04.0f", crimeraw$`Time Occurred`), 
+                                 format="%H%M"), 12, 16), '%H:%M'), '%I:%M %p')
+```
+
+View missing data
+```{r}
+skimr::skim(crimeraw)
+```
+
+MISSING: Weapon Code
+EMPTY: Victim Sex, Victim Ethnicity, Premise, Weapon
+IF missing, change to 999
+FIX: empty cells will not change to value or NA
+```{r}
+crimeraw$`Weapon Code` <- crimeraw$`Weapon Code` %>% replace_na(999)
+```
+
+
+New dataset created
+START HERE
+```{r}
+#Save as changes as a new file
+write_rds(crimeraw, "crimedatnew.rds")
+crimedat <- read_rds("crimedatnew.rds")
+crimedat <- as.data.frame(crimedat)
+```
+
+
+
+EDA
+Extract top 10 areas
+```{r}
+#Create new df to arrange 
+crime_frequency <-count(crimedat, Area)
+
+#Create table of crime frequency highest to lowest
+crime_frequency %>%
+  arrange(desc(crime_frequency$n)) %>%
+knitr::kable() 
+
+#Filter df to only focus on top 10 areas
+crimedat <- subset(crimedat, Area %in% c("Central", "77th Street", "Pacific", "Southwest", "Hollywood", "Southeast", "N Hollywood", "Newton", "Olympic", "Wilshire"))
+```
+
+EDA #1: What is the amount of crime per area in LA?
+Count of crime per area
+
+Proportions of crime in area
+FIX: figure out how to combine percents into the same table
+```{r}
+#Percentage of Crime
+sort(round(prop.table(table(crimedat$`Area`)) * 100, 3), T) %>%
+knitr::kable()
+```
+
+Visualization of top 10 areas
+```{r}
+v1 <- table(crimedat$`Area`)
+barplot(sort(v1, T), las = 2, col = rainbow(12), cex.names= .7, main = "Top 10 Areas with Crime", xlab = "Area", ylab = "Count")     
+```
+
+```{r}
+#Create CrimeCount col for the Area
+crimedat <- crimedat %>%
+  group_by(`Area`) %>% 
+  mutate(CrimeCount = n())
+```
+
+```{r}
+crimedat$Month = format(crimedat$`Date Occurred`, "%B")
+
+# convert dates to character data
+#strDates <- as.character(dates)
+```
+
+FIX: find month with the highest crime (3 years of data)
+```{r}
+crimedat %>%
+ggplot(aes(x = Month, y = CrimeCount)) 
+```
+
+
