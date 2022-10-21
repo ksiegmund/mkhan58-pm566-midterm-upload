@@ -111,8 +111,10 @@ crime_frequency %>%
 knitr::kable() 
 
 #Filter df to only focus on top 10 areas
-crimedat <- subset(crimedat, Area %in% c("Central", "77th Street", "Pacific", "Southwest", "Hollywood", "Southeast", "N Hollywood", "Newton", "Olympic", "Wilshire"))
+#crimedat <- subset(crimedat, Area %in% c("Central", "77th Street", "Pacific", "Southwest", "Hollywood", "Southeast", "N Hollywood", "Newton", "Olympic", "Wilshire"))
 ```
+
+You don't want to subset the data before you've computed percentages.
 
 EDA #1: What is the amount of crime per area in LA?
 Count of crime per area
@@ -125,18 +127,22 @@ sort(round(prop.table(table(crimedat$`Area`)) * 100, 3), T) %>%
 knitr::kable()
 ```
 
+```{r}
+nc <- sum(crime_frequency$n)
+
+crime_frequency %>% 
+  arrange(desc(n)) %>%
+  mutate(pct = round( n / nc * 100,1))
+```
+
+
 Visualization of top 10 areas
 ```{r}
 v1 <- table(crimedat$`Area`)
-barplot(sort(v1, T), las = 2, col = rainbow(12), cex.names= .7, main = "Top 10 Areas with Crime", xlab = "Area", ylab = "Count")     
+barplot(sort(v1, T)[1:10], las = 2, col = rainbow(12), cex.names= .7, main = "Top 10 Areas with Crime", xlab = "Area", ylab = "Count")     
 ```
 
-```{r}
-#Create CrimeCount col for the Area
-crimedat <- crimedat %>%
-  group_by(`Area`) %>% 
-  mutate(CrimeCount = n())
-```
+Get month before counting crimes by month and area.
 
 ```{r}
 crimedat$Month = format(crimedat$`Date Occurred`, "%B")
@@ -145,10 +151,20 @@ crimedat$Month = format(crimedat$`Date Occurred`, "%B")
 #strDates <- as.character(dates)
 ```
 
+```{r}
+#Create CrimeCount col for the Area
+crimedat <- crimedat %>%
+  group_by(Month,`Area`) %>% 
+  summarize(CrimeCount = n())
+```
+
+
+
 FIX: find month with the highest crime (3 years of data)
 ```{r}
 crimedat %>%
-ggplot(aes(x = Month, y = CrimeCount)) 
+ggplot(aes(x = Month, y = CrimeCount, fill = Area)) +
+  geom_bar(stat = "identity")
 ```
 
 
